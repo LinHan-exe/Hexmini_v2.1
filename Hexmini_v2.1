@@ -1,0 +1,117 @@
+//@version=5
+indicator("Hexmini V2.1 ADX EMA Trend Detector", overlay=true)
+
+// Inputs
+adxLength = input.int(5, title="ADX Length", minval=1)
+emaShortLength = input.int(2, title="EMA Short Length", minval=1)
+emaLongLength = input.int(5, title="EMA Long Length", minval=1)
+
+// Calculate indicators
+[diplus, diminus, adx] = ta.dmi(adxLength, adxLength)
+emaShort = ta.ema(close, emaShortLength)
+emaLong = ta.ema(close, emaLongLength)
+
+// Function to determine if it's the first candle of the day
+isFirstCandleOfDay() =>
+    t = time("D")
+    not na(t) and (na(t[1]) or t > t[1])
+
+// Function to determine EMA position
+getEmaPosition() =>
+    if emaShort > emaLong
+        "bullish"
+    else if emaShort < emaLong
+        "bearish"
+    else
+        emaShort[1] > emaLong[1] ? "bearish" : "bullish"
+
+// Variables
+var float prevADX = na
+var string currentTrend = na
+var string displayTrend = na
+var color trendColor = na
+var string prevEmaPosition = na
+var float Trend_Strength = 10
+var string Trend_Status = "No Change"
+var bool reversal = false
+
+// Update EMA position
+emaPosition = getEmaPosition()
+
+// Detect EMA crossover
+emaCrossover = emaPosition != prevEmaPosition
+
+// Reset trend and Trend_Strength at the start of each day
+if isFirstCandleOfDay()
+    currentTrend := emaPosition == "bullish" ? "Uptrend" : "Downtrend"
+    Trend_Strength := 10
+    reversal := false
+
+// Trend determination logic
+if emaCrossover
+    currentTrend := emaPosition == "bullish" ? "Uptrend" : "Downtrend"
+    if not reversal and adx < prevADX
+        Trend_Status := "Reversing"
+        reversal := true
+        Trend_Strength := 1.25 * (prevADX - adx) + 10
+    else
+        Trend_Strength := 10
+        Trend_Status := "No Change"
+else
+    if reversal
+        if adx < prevADX
+            Trend_Status := "Strength Increasing"
+            Trend_Strength := Trend_Strength + (prevADX - adx)
+        else if adx == prevADX
+            Trend_Status := "No Change"
+        else
+            reversal := false
+            Trend_Status := "Strength Increasing"
+            Trend_Strength := Trend_Strength + (adx - prevADX)
+    else
+        if adx > prevADX
+            Trend_Status := "Strength Increasing"
+            Trend_Strength := Trend_Strength + (adx - prevADX)
+        else if adx == prevADX
+            Trend_Status := "No Change"
+        else
+            Trend_Status := "Strength Decreasing"
+            Trend_Strength := Trend_Strength + (adx - prevADX)
+
+// Determine trend strength category
+trendStrengthCategory = Trend_Strength < 15 ? "Weak " : Trend_Strength > 50 ? "Strong " : ""
+displayTrend := trendStrengthCategory + currentTrend
+
+// Calculate gradient color
+greenColor = color.rgb(0, 150, 0)  // Dark Green
+redColor = color.rgb(225, 0, 0)    // Red
+yellowColor = color.rgb(235, 235, 0)  // Standard yellow
+lightOrangeColor = color.rgb(255, 225, 0)  // Light orange
+
+gradientColor = color.from_gradient(Trend_Strength, 0, 70, emaPosition == "bullish" ? yellowColor : lightOrangeColor, emaPosition == "bullish" ? greenColor : redColor)
+
+trendColor := gradientColor
+
+// Update prevEmaPosition and prevADX for next iteration
+prevEmaPosition := emaPosition
+prevADX := adx
+
+// Plot background color
+bgcolor(color.new(trendColor, 75))
+
+// GUI
+var table trendTable = table.new(position.top_right, 2, 2, border_width=1)
+
+table.cell(trendTable, 0, 0, "ADX EMA Trend Detection", bgcolor=color.gray, text_color=color.white)
+table.cell(trendTable, 0, 1, "Current Trend:", bgcolor=color.gray, text_color=color.white)
+table.cell(trendTable, 1, 1, displayTrend, bgcolor=trendColor, text_color=color.white)
+
+trendStatusColor = Trend_Status == "Strength Increasing" ? color.green :
+                   Trend_Status == "Strength Decreasing" ? color.red :
+                   color.gray
+
+table.cell(trendTable, 1, 0, "Trend: " + Trend_Status, bgcolor=trendStatusColor, text_color=color.white)
+
+// Plot EMAs for reference
+plot(emaShort, color=color.blue, title="EMA Short")
+plot(emaLong, color=color.red, title="EMA Long")
