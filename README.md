@@ -9,6 +9,8 @@ The more Green/Red the background is, the stronger a trend is. Weaker trends wil
 There are over 100 unique shades of color in the gradient from Green to Red on the graph based on trend strength.
 Trend strength changes based on ADX are also displayed in the top right corner. 
 
+This indicator is best used on the 5 minute candlestick chart.
+
 Default Settings:
 ADX Length: 5
 EMA Short Length: 2
